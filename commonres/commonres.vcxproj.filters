@@ -14,7 +14,7 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
     </Filter>
     <Filter Include="HttpDownloadDlg">
-      <UniqueIdentifier>{0dbbe057-b48b-4608-9a19-01af60529ea1}</UniqueIdentifier>
+      <UniqueIdentifier>{e8bd130d-ef6b-45de-938b-753e1f1de542}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
