@@ -581,7 +581,7 @@ static void ProcessExifDir(unsigned char * DirStart, unsigned char * OffsetBase,
                 case FMT_UNDEFINED:
                     // Undefined is typically an ascii string.
 
-                case FMT_STRING:
+                case FMT_STRING_:
                     // String arrays printed without function call (different from int arrays)
                     {
                         int NoPrint = 0;
@@ -1102,7 +1102,7 @@ void create_EXIF(void)
         {
             // Date/time entry
             Put16u(Buffer+DirIndex, TAG_DATETIME);         // Tag
-            Put16u(Buffer+DirIndex + 2, FMT_STRING);       // Format
+            Put16u(Buffer+DirIndex + 2, FMT_STRING_);       // Format
             Put32u(Buffer+DirIndex + 4, 20);               // Components
             Put32u(Buffer+DirIndex + 8, DataWriteIndex-8); // Pointer or value.
             DirIndex += 12;
@@ -1140,7 +1140,7 @@ void create_EXIF(void)
 
         // Original date/time entry
         Put16u(Buffer+DirIndex, TAG_DATETIME_ORIGINAL);         // Tag
-        Put16u(Buffer+DirIndex + 2, FMT_STRING);       // Format
+        Put16u(Buffer+DirIndex + 2, FMT_STRING_);       // Format
         Put32u(Buffer+DirIndex + 4, 20);               // Components
         Put32u(Buffer+DirIndex + 8, DataWriteIndex-8); // Pointer or value.
         DirIndex += 12;

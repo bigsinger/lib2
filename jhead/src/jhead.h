@@ -169,7 +169,7 @@ extern const int BytesPerFormat[];
 #define NUM_FORMATS 12
 
 #define FMT_BYTE       1 
-#define FMT_STRING     2
+#define FMT_STRING_     2	//原FMT_STRING，与FMT库冲突，修改下。
 #define FMT_USHORT     3
 #define FMT_ULONG      4
 #define FMT_URATIONAL  5

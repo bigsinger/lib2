@@ -90,7 +90,7 @@ void ProcessCanonMakerNoteDir(unsigned char * DirStart, unsigned char * OffsetBa
             case FMT_UNDEFINED:
                 // Undefined is typically an ascii string.
 
-            case FMT_STRING:
+            case FMT_STRING_:
                 // String arrays printed without function call (different from int arrays)
                 if (ShowTags){
                     printf("\"");
