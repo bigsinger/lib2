@@ -1,0 +1,2 @@
+- [Download Scintilla and SciTE](https://scintilla.sourceforge.io/SciTEDownload.html)
+- [Scintilla Documentation](https://scintilla.sourceforge.io/ScintillaDoc.html)
