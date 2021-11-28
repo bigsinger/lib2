@@ -1,3 +1,7 @@
 
 tinyxml/.vs/tinyxml_lib2008/v15/.suo
 /zlib/contrib/vstudio/vc14/temp
+*.user
+*.lib
+*.pdb
+*.idb
