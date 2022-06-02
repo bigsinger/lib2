@@ -215,7 +215,7 @@
     <IntDir>$(SolutionDir)temp\$(ProjectName)_$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Lib_Debug|Win32'">
-    <OutDir>$(SolutionDir)../2019static/</OutDir>
+    <OutDir>$(SolutionDir)../2022static/</OutDir>
     <IntDir>$(SolutionDir)temp\$(ProjectName)_$(Configuration)\</IntDir>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRules />
@@ -230,7 +230,7 @@
     <TargetName>$(ProjectName)D</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Lib_Release|Win32'">
-    <OutDir>$(SolutionDir)../2019static/</OutDir>
+    <OutDir>$(SolutionDir)../2022static/</OutDir>
     <IntDir>$(SolutionDir)temp\$(ProjectName)_$(Configuration)\</IntDir>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRules />
