@@ -1,7 +1,9 @@
 *.suo
 */temp
+*/Debug
+*/Release
 *.idb
 *.user
 *.pdb
 *.idb
-vs
+*.vs
