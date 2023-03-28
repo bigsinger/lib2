@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 #ifdef _WIN32
     #include <direct.h> // for mkdir under windows.
-    #define mkdir(dir,mode) mkdir(dir)
+    #define mkdir(dir,mode) _mkdir(dir)
     #define S_ISDIR(a)   (a & _S_IFDIR)
 #endif
 
@@ -36,7 +36,7 @@ int EnsurePathExists(const char * FileName)
         a--;
         if (a == 0){
             NewPath[0] = 0;
-            break;    
+            break;
         }
         if (NewPath[a] == SLASH){
             struct stat dummy;
@@ -100,7 +100,7 @@ void CatPath(char * BasePath, const char * FilePath)
         strcpy(BasePath, FilePath);
         return;
     }
-    
+
     if (BasePath[l-1] != SLASH){
         BasePath[l++] = SLASH;
         BasePath[l] = 0;
@@ -135,6 +135,6 @@ main()
     CatPath(BasePath, "c:\\hello.txt");
     CatPath(BasePath, "c:\\world\\hello.txt");
     CatPath(BasePath, "c:\\abresl\\hello.txt");
-   
+
 }
 */

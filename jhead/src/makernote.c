@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Parse some maker specific onformation.
+// Parse some maker specific information.
 // (Very limited right now - add maker specific stuff to this module)
 //--------------------------------------------------------------------------
 #include "jhead.h"
@@ -9,7 +9,7 @@ extern int MotorolaOrder;
 //--------------------------------------------------------------------------
 // Process exif format directory, as used by Cannon maker note
 //--------------------------------------------------------------------------
-void ProcessCanonMakerNoteDir(unsigned char * DirStart, unsigned char * OffsetBase, 
+static void ProcessCanonMakerNoteDir(unsigned char * DirStart, unsigned char * OffsetBase,
         unsigned ExifLength)
 {
     int de;
@@ -28,7 +28,7 @@ void ProcessCanonMakerNoteDir(unsigned char * DirStart, unsigned char * OffsetBa
         }
 
         if (DumpExifMap){
-            printf("Map: %05d-%05d: Directory (makernote)\n",(int)(DirStart-OffsetBase), (int)(DirEnd-OffsetBase));
+            printf("Map: %05u-%05u: Directory (makernote)\n",(int)(DirStart-OffsetBase), (int)(DirEnd-OffsetBase));
         }
     }
 
@@ -47,6 +47,12 @@ void ProcessCanonMakerNoteDir(unsigned char * DirStart, unsigned char * OffsetBa
         Format = Get16u(DirEntry+2);
         Components = Get32u(DirEntry+4);
 
+        if (Components > 0x10000){
+            //Components count too large could cause overflow on subsequent check
+            ErrNonfatal("Bad components count %x", Components,0);
+            continue;
+        }
+
         if ((Format-1) >= NUM_FORMATS) {
             // (-1) catches illegal zero case as unsigned underflows to positive large.
             ErrNonfatal("Illegal Exif number format %d for maker tag %04x", Format, Tag);
@@ -59,12 +65,11 @@ void ProcessCanonMakerNoteDir(unsigned char * DirStart, unsigned char * OffsetBa
         }
 
         ByteCount = Components * BytesPerFormat[Format];
-
         if (ByteCount > 4){
             unsigned OffsetVal;
             OffsetVal = Get32u(DirEntry+8);
             // If its bigger than 4 bytes, the dir entry contains an offset.
-            if (OffsetVal+ByteCount > ExifLength){
+            if (OffsetVal+ByteCount > (unsigned)ExifLength || OffsetVal > 65536){
                 // Bogus pointer offset and / or bytecount value
                 ErrNonfatal("Illegal value pointer for Exif maker tag %04x", Tag,0);
                 continue;
@@ -90,7 +95,7 @@ void ProcessCanonMakerNoteDir(unsigned char * DirStart, unsigned char * OffsetBa
             case FMT_UNDEFINED:
                 // Undefined is typically an ascii string.
 
-            case FMT_STRING_:
+            case FMT_STRING:
                 // String arrays printed without function call (different from int arrays)
                 if (ShowTags){
                     printf("\"");
@@ -119,13 +124,16 @@ void ProcessCanonMakerNoteDir(unsigned char * DirStart, unsigned char * OffsetBa
                 }
         }
         if (Tag == 1 && Components > 16){
-            int IsoCode = Get16u(ValuePtr + 16*sizeof(unsigned short));
+            int IsoCode;
+            if (ByteCount < 17 * sizeof(short)) continue; // Fuzztest -- not enough allocated.
+            IsoCode = Get16u(ValuePtr + 16*sizeof(unsigned short));
             if (IsoCode >= 16 && IsoCode <= 24){
                 ImageInfo.ISOequivalent = 50 << (IsoCode-16);
-            } 
+            }
         }
 
         if (Tag == 4 && Format == FMT_USHORT){
+            if (ByteCount < 20 * sizeof(short)) continue; // Fuzztest -- not enough allocated.
             if (Components > 7){
                 int WhiteBalance = Get16u(ValuePtr + 7*sizeof(unsigned short));
                 switch(WhiteBalance){
@@ -154,7 +162,7 @@ void ProcessCanonMakerNoteDir(unsigned char * DirStart, unsigned char * OffsetBa
 //--------------------------------------------------------------------------
 // Show generic maker note - just hex bytes.
 //--------------------------------------------------------------------------
-void ShowMakerNoteGeneric(unsigned char * ValuePtr, int ByteCount)
+static void ShowMakerNoteGeneric(unsigned char * ValuePtr, int ByteCount)
 {
     int a;
     for (a=0;a<ByteCount;a++){
@@ -171,7 +179,7 @@ void ShowMakerNoteGeneric(unsigned char * ValuePtr, int ByteCount)
 //--------------------------------------------------------------------------
 // Process maker note - to the limited extent that its supported.
 //--------------------------------------------------------------------------
-void ProcessMakerNote(unsigned char * ValuePtr, int ByteCount, 
+void ProcessMakerNote(unsigned char * ValuePtr, int ByteCount,
         unsigned char * OffsetBase, unsigned ExifLength)
 {
     if (strstr(ImageInfo.CameraMake, "Canon")){
@@ -188,4 +196,3 @@ void ProcessMakerNote(unsigned char * ValuePtr, int ByteCount,
         }
     }
 }
-

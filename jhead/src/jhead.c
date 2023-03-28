@@ -1,29 +1,30 @@
 //--------------------------------------------------------------------------
-// Program to pull the information out of various types of EXIF digital 
+// Program to pull the information out of various types of EXIF digital
 // camera files and show it in a reasonably consistent way
 //
-// Version 2.96
+// Version 3.06
 //
-// Compiling under Windows:  
+// Compiling under Windows:
 //   Make sure you have Microsoft's compiler on the path, then run make.bat
 //
-// Dec 1999 - Jun 2012
+// Dec 1999 - Oct 2020
 //
-// by Matthias Wandel   www.sentex.net/~mwandel
+// by Matthias Wandel   http://woodgears.ca
 //--------------------------------------------------------------------------
+#ifdef _WIN32
+    #include <io.h>
+#endif
+
 #include "jhead.h"
 
 #include <sys/stat.h>
 
-#define JHEAD_VERSION "2.96"
+#define JHEAD_VERSION "3.06"
 
-// This #define turns on features that are too very specific to 
+// This #define turns on features that are too very specific to
 // how I organize my photos.  Best to ignore everything inside #ifdef MATTHIAS
-//#define MATTHIAS
+#define MATTHIAS
 
-#ifdef _WIN32
-    #include <io.h>
-#endif
 
 // Bitmasks for DoModify:
 #define MODIFY_ANY  1
@@ -31,67 +32,70 @@
 #define JPEGS_ONLY  4
 #define MODIFY_JPEG 5
 #define READ_JPEG   6
-int DoModify     = FALSE;
+int DoModify  = FALSE;
 
 
-int FilesMatched;
-int FileSequence;
+static int FilesMatched;
+static int FileSequence;
 
-const char * CurrentFile;
+static const char * CurrentFile;
 
-const char * progname;   // program name for error messages
+static const char * progname;   // program name for error messages
 
 //--------------------------------------------------------------------------
 // Command line options flags
-int TrimExif = FALSE;        // Cut off exif beyond interesting data.
-int RenameToDate = 0;        // 1=rename, 2=rename all.
+static int TrimExif = FALSE;        // Cut off exif beyond interesting data.
+static int RenameToDate = 0;        // 1=rename, 2=rename all.
 #ifdef _WIN32
-int RenameAssociatedFiles = FALSE;
+static int RenameAssociatedFiles = FALSE;
 #endif
-char * strftime_args = NULL; // Format for new file name.
-int Exif2FileTime  = FALSE;
+static char * strftime_args = NULL; // Format for new file name.
+static int Exif2FileTime  = FALSE;
        int ShowTags     = FALSE;    // Do not show raw by default.
-int Quiet        = FALSE;    // Be quiet on success (like unix programs)
+static int Quiet        = FALSE;    // Be quiet on success (like unix programs)
        int DumpExifMap  = FALSE;
-int ShowConcise  = FALSE;
-int CreateExifSection = FALSE;
-char * ApplyCommand = NULL;  // Apply this command to all images.
-char * FilterModel = NULL;
-int    ExifOnly    = FALSE;
-int    PortraitOnly = FALSE;
-time_t ExifTimeAdjust = 0;   // Timezone adjust
-time_t ExifTimeSet = 0;      // Set exif time to a value.
-char DateSet[11];
-unsigned DateSetChars = 0;
-unsigned FileTimeToExif = FALSE;
+static int ShowConcise  = FALSE;
+static int CreateExifSection = FALSE;
+static int TrimExifTrailingZeroes = FALSE;
+static char * ApplyCommand = NULL;  // Apply this command to all images.
+static char * FilterModel = NULL;
+static int    FilterQuality = 0;
+static int    ExifOnly    = FALSE;  // Only do images with exif header
+static int    ProcessOnly = -1;     // 0 for baseline, 2 for progressive only, -1 for all images.
+static int    PortraitOnly = FALSE; // Only do images with portrait orientation.
+static time_t ExifTimeAdjust = 0;   // Timezone adjust
+static time_t ExifTimeSet = 0;      // Set exif time to a value.
+static char DateSet[11];
+static unsigned DateSetChars = 0;
+static unsigned FileTimeToExif = FALSE;
 
 int DeleteComments = FALSE;
 int DeleteExif = FALSE;
 int DeleteIptc = FALSE;
 int DeleteXmp = FALSE;
 int DeleteUnknown = FALSE;
-char * ThumbSaveName = NULL; // If not NULL, use this string to make up
+static char * ThumbSaveName = NULL; // If not NULL, use this string to make up
                                     // the filename to store the thumbnail to.
 
-char * ThumbInsertName = NULL; // If not NULL, use this string to make up
+static char * ThumbInsertName = NULL; // If not NULL, use this string to make up
                                     // the filename to retrieve the thumbnail from.
 
-int RegenThumbnail = FALSE;
+static int RegenThumbnail = FALSE;
 
 char * ExifXferScrFile = NULL;// Extract Exif header from this file, and
                                     // put it into the Jpegs processed.
 
-int EditComment = FALSE;     // Invoke an editor for editing the comment
-int SupressNonFatalErrors = FALSE; // Wether or not to pint warnings on recoverable errors
+static int EditComment = FALSE;     // Invoke an editor for editing the comment
+static int SuppressNonFatalErrors = FALSE; // Whether or not to pint warnings on recoverable errors
 
-char * CommentSavefileName = NULL; // Save comment to this file.
-char * CommentInsertfileName = NULL; // Insert comment from this file.
+static char * CommentSavefileName = NULL; // Save comment to this file.
+static char * CommentInsertfileName = NULL; // Insert comment from this file.
 char * CommentInsertLiteral = NULL;  // Insert this comment (from command line)
 
 int AutoRotate = FALSE;
 int ZeroRotateTagOnly = FALSE;
 
-int ShowFileInfo = TRUE;     // Indicates to show standard file info
+static int ShowFileInfo = TRUE;     // Indicates to show standard file info
                                     // (file name, file size, file date)
 
 
@@ -100,34 +104,34 @@ int ShowFileInfo = TRUE;     // Indicates to show standard file info
     // the comments in a JPEG.  The programs rdjpgcom and wrjpgcom
     // included with Linux distributions do a better job.
 
-    char * AddComment = NULL; // Add this tag.
-    char * RemComment = NULL; // Remove this tag
-    int AutoResize = FALSE;
+    static char * AddComment = NULL; // Add this tag.
+    static char * RemComment = NULL; // Remove this tag
+    static int AutoResize = FALSE;
 #endif // MATTHIAS
 
 //--------------------------------------------------------------------------
 // Error exit handler
 //--------------------------------------------------------------------------
-void ErrFatal(char * msg)
+void ErrFatal(const char * msg)
 {
     fprintf(stderr,"\nError : %s\n", msg);
     if (CurrentFile) fprintf(stderr,"in file '%s'\n",CurrentFile);
     exit(EXIT_FAILURE);
-} 
+}
 
 //--------------------------------------------------------------------------
 // Report non fatal errors.  Now that microsoft.net modifies exif headers,
 // there's corrupted ones, and there could be more in the future.
 //--------------------------------------------------------------------------
-void ErrNonfatal(char * msg, int a1, int a2)
+void ErrNonfatal(const char * msg, int a1, int a2)
 {
-    if (SupressNonFatalErrors) return;
+    if (SuppressNonFatalErrors) return;
 
     fprintf(stderr,"\nNonfatal Error : ");
     if (CurrentFile) fprintf(stderr,"'%s' ",CurrentFile);
     fprintf(stderr, msg, a1, a2);
     fprintf(stderr, "\n");
-} 
+}
 
 
 //--------------------------------------------------------------------------
@@ -162,6 +166,15 @@ static int FileEditComment(char * TempFileName, char * Comment, int CommentSize)
         }
         if (strlen(Editor) > PATH_MAX) ErrFatal("env too long");
 
+        // Disallow characters in the editor or filename that could be used to execute arbitrary
+        // shell commands with system() below.
+        if (strpbrk(TempFileName, "\";'&|`$")) {
+            ErrFatal("Filename has invalid characters");
+        }
+        if (strpbrk(Editor, "\";'&|`$")) {
+            ErrFatal("Editor has invalid characters");
+        }
+
         sprintf(QuotedPath, "%s \"%s\"",Editor, TempFileName);
         a = system(QuotedPath);
     }
@@ -177,7 +190,7 @@ static int FileEditComment(char * TempFileName, char * Comment, int CommentSize)
     }
 
     // Read the file back in.
-    CommentSize = fread(Comment, 1, 999, file);
+    CommentSize = fread(Comment, 1, MAX_COMMENT_SIZE, file);
 
     fclose(file);
 
@@ -242,6 +255,7 @@ static int ModifyDescriptComment(char * OutComment, char * SrcComment)
                                 if (!memcmp(Line, AddComment, l+1)){
                                     TagExists = TRUE;
                                     strncpy(Line, AddComment, sizeof(Line));
+                                    Line[sizeof(Line)-1]='\0';
                                     Modified = TRUE;
                                 }
                             }
@@ -267,7 +281,7 @@ static int ModifyDescriptComment(char * OutComment, char * SrcComment)
 
     if (!HasScandate && !ImageInfo.DateTime[0]){
         // Scan date is not in the file yet, and it doesn't have one built in.  Add it.
-        char Temp[30];
+        char Temp[40];
         sprintf(Temp, "scan_date=%s", ctime(&ImageInfo.FileDateTime));
         strncat(OutComment, Temp, MAX_COMMENT_SIZE-5-strlen(OutComment));
         Modified = TRUE;
@@ -281,20 +295,27 @@ static int AutoResizeCmdStuff(void)
 {
     static char CommandString[PATH_MAX+1];
     double scale;
+    float TargetSize = 1800;
 
     ApplyCommand = CommandString;
 
-    if (ImageInfo.Height <= 1280 && ImageInfo.Width <= 1280){
+    scale = TargetSize / ImageInfo.Width;
+    if (scale > TargetSize / ImageInfo.Height) scale = TargetSize / ImageInfo.Height;
+
+    if (scale > 0.8){
+        if (ImageInfo.QualityGuess >= 93){
+            // Re-compress at lower quality.
+            sprintf(CommandString, "mogrify -quality 86 &i");
+            return TRUE;
+        }
         printf("not resizing %dx%x '%s'\n",ImageInfo.Height, ImageInfo.Width, ImageInfo.FileName);
         return FALSE;
     }
 
-    scale = 1024.0 / ImageInfo.Height;
-    if (1024.0 / ImageInfo.Width < scale) scale = 1024.0 / ImageInfo.Width;
+    if (scale < 0.4) scale = 0.4; // Don't scale down by too much.
 
-    if (scale < 0.5) scale = 0.5; // Don't scale down by more than a factor of two.
-
-    sprintf(CommandString, "mogrify -geometry %dx%d -quality 85 &i",(int)(ImageInfo.Width*scale), (int)(ImageInfo.Height*scale));
+    sprintf(CommandString, "mogrify -geometry %dx%d -quality 85 &i",(int)(ImageInfo.Width*scale+0.5),
+                                    (int)(ImageInfo.Height*scale+0.5));
     return TRUE;
 }
 
@@ -317,8 +338,8 @@ static int shellescape(char* to, const char* from)
     while(from[i])
     {
 #ifdef _WIN32
-        // Under WIN32, there isn't really anything dangerous you can do with 
-        // escape characters, plus windows users aren't as sercurity paranoid.
+        // Under WIN32, there isn't really anything dangerous you can do with
+        // escape characters, plus windows users aren't as security paranoid.
         // Hence, no need to do fancy escaping.
         to[j++] = from[i++];
 #else
@@ -332,7 +353,7 @@ static int shellescape(char* to, const char* from)
             default:
                 to[j++] = from[i++];
         }
-#endif 
+#endif
         if (j >= PATH_MAX) ErrFatal("max path exceeded");
     }
     to[j++] = '"';
@@ -360,11 +381,11 @@ static void DoCommand(const char * FileName, int ShowIt)
     strcpy(TempName+a, "XXXXXX");
 
     // Note: Compiler will warn about mkstemp.  but I need a filename, not a file.
-    // I could just then get the fiel name from what mkstemp made, and pass that
+    // I could just then get the file name from what mkstemp made, and pass that
     // to the executable, but that would make for the exact same vulnerability
     // as mktemp - that is, that between getting the random name, and making the file
     // some other program could snatch that exact same name!
-    // also, not all pltforms support mkstemp.
+    // also, not all platforms support mkstemp.
     mktemp(TempName);
 
 
@@ -409,8 +430,21 @@ static void DoCommand(const char * FileName, int ShowIt)
         // Don't delete original file until we know a new one was created by the command.
         struct stat dummy;
         if (stat(TempName, &dummy) == 0){
+            struct stat buf;
+            int stat_result = stat(FileName, &buf);
+
             unlink(FileName);
             rename(TempName, FileName);
+            if (stat_result == 0){
+                // set Unix access rights and time to new file
+                struct utimbuf mtime;
+                chmod(FileName, buf.st_mode);
+
+                mtime.actime = buf.st_atime;
+                mtime.modtime = buf.st_mtime;
+
+                utime(FileName, &mtime);
+            }
         }else{
             ErrFatal("specified command did not produce expected output file");
         }
@@ -424,13 +458,24 @@ static int CheckFileSkip(void)
 {
     // I sometimes add code here to only process images based on certain
     // criteria - for example, only to convert non progressive Jpegs to progressives, etc..
+    if(ProcessOnly >= 0 && (ImageInfo.Process & 0x0f) != ProcessOnly){
+        // ProcessOnly == 0 means skip baseline oencoded jpegs
+        // ProcessOnly == 2 means skip progressive oencoded jpegs
+        return TRUE;
+    }
 
     if (FilterModel){
         // Filtering processing by camera model.
-        // This feature is useful when pictures from multiple cameras are colated, 
+        // This feature is useful when pictures from multiple cameras are collated,
         // the its found that one of the cameras has the time set incorrectly.
         if (strstr(ImageInfo.CameraModel, FilterModel) == NULL){
             // Skip.
+            return TRUE;
+        }
+    }
+    if (FilterQuality > 0){
+        //Filter by above threshold quality
+        if (ImageInfo.QualityGuess < FilterQuality){
             return TRUE;
         }
     }
@@ -454,23 +499,27 @@ static int CheckFileSkip(void)
 }
 
 //--------------------------------------------------------------------------
-// Subsititute original name for '&i' if present in specified name.
+// Substitute original name for '&i' if present in specified name.
 // This to allow specifying relative names when manipulating multiple files.
 //--------------------------------------------------------------------------
 static void RelativeName(char * OutFileName, const char * NamePattern, const char * OrigName)
 {
-    // If the filename contains substring "&i", then substitute the 
+    // If the filename contains substring "&i", then substitute the
     // filename for that.  This gives flexibility in terms of processing
     // multiple files at a time.
     char * Subst;
     Subst = strstr(NamePattern, "&i");
+    if (Subst > NamePattern+PATH_MAX-10){
+        ErrFatal("Bad file name pattern");
+    }
+
     if (Subst){
         strncpy(OutFileName, NamePattern, Subst-NamePattern);
         OutFileName[Subst-NamePattern] = 0;
-        strncat(OutFileName, OrigName, PATH_MAX);
-        strncat(OutFileName, Subst+2, PATH_MAX);
+        strncat(OutFileName, OrigName, PATH_MAX-1-strlen(OutFileName));
+        strncat(OutFileName, Subst+2, PATH_MAX-1-strlen(OutFileName));
     }else{
-        strncpy(OutFileName, NamePattern, PATH_MAX); 
+        strncpy(OutFileName, NamePattern, PATH_MAX);
     }
 }
 
@@ -537,8 +586,6 @@ void RenameAssociated(const char * FileName, char * NewBaseName)
 //--------------------------------------------------------------------------
 static void DoFileRenaming(const char * FileName)
 {
-    int NumAlpha = 0;
-    int NumDigit = 0;
     int PrefixPart = 0; // Where the actual filename starts.
     int ExtensionPart;  // Where the file extension starts.
     int a;
@@ -551,15 +598,13 @@ static void DoFileRenaming(const char * FileName)
     for (a=0;FileName[a];a++){
         if (FileName[a] == SLASH){
             // Don't count path component.
-            NumAlpha = 0;
-            NumDigit = 0;
             PrefixPart = a+1;
         }
 
         if (FileName[a] == '.') ExtensionPart = a;  // Remember where extension starts.
-
-        if (isalpha(FileName[a])) NumAlpha += 1;    // Tally up alpha vs. digits to judge wether to rename.
-        if (isdigit(FileName[a])) NumDigit += 1;
+    }
+    if (ExtensionPart < PrefixPart) { // no extension found
+        ExtensionPart = strlen(FileName);
     }
 
     if (!Exif2tm(&tm, ImageInfo.DateTime)){
@@ -567,7 +612,7 @@ static void DoFileRenaming(const char * FileName)
         // Use file date/time instead.
         tm = *localtime(&ImageInfo.FileDateTime);
     }
-    
+
 
     strncpy(NewBaseName, FileName, PATH_MAX); // Get path component of name.
 
@@ -595,7 +640,7 @@ static void DoFileRenaming(const char * FileName)
         }
 
         {
-            // Sequential number renaming part.  
+            // Sequential number renaming part.
             // '%i' type pattern becomes sequence number.
             int ppos = -1;
             for (a=0;pattern[a];a++){
@@ -634,13 +679,13 @@ static void DoFileRenaming(const char * FileName)
 
     AddLetter = isdigit(NewBaseName[strlen(NewBaseName)-1]);
     for (a=0;;a++){
-        char NewName[PATH_MAX+10];
+        char NewName[PATH_MAX*2+10];
         char NameExtra[3];
         struct stat dummy;
 
         if (a){
             // Generate a suffix for the file name if previous choice of names is taken.
-            // depending on wether the name ends in a letter or digit, pick the opposite to separate
+            // depending on whether the name ends in a letter or digit, pick the opposite to separate
             // it.  This to avoid using a separator character - this because any good separator
             // is before the '.' in ascii, and so sorting the names would put the later name before
             // the name without suffix, causing the pictures to more likely be out of order.
@@ -654,7 +699,7 @@ static void DoFileRenaming(const char * FileName)
             NameExtra[0] = 0;
         }
 
-        sprintf(NewName, "%s%s.jpg", NewBaseName, NameExtra);
+        snprintf(NewName, sizeof(NewName), "%s%s.jpg", NewBaseName, NameExtra);
 
         if (!strcmp(FileName, NewName)) break; // Skip if its already this name.
 
@@ -692,26 +737,27 @@ static void DoFileRenaming(const char * FileName)
 //--------------------------------------------------------------------------
 static int DoAutoRotate(const char * FileName)
 {
-    if (ImageInfo.Orientation >= 2 && ImageInfo.Orientation <= 8){
+    if (ImageInfo.Orientation != 1){
         const char * Argument;
         Argument = ClearOrientation();
+        if (Argument == NULL) return FALSE; // orientation tag in image, nothing changed.
 
         if (!ZeroRotateTagOnly){
             char RotateCommand[PATH_MAX*2+50];
-            if (Argument == NULL){
-                ErrFatal("Orientation screwup");
+            if (strlen(Argument) == 0){
+                // Unknown orientation, but still modified.
+                return TRUE; // Image is still modified.
             }
-
             sprintf(RotateCommand, "jpegtran -trim -%s -outfile &o &i", Argument);
             ApplyCommand = RotateCommand;
             DoCommand(FileName, FALSE);
             ApplyCommand = NULL;
 
             // Now rotate the thumbnail, if there is one.
-            if (ImageInfo.ThumbnailOffset && 
-                ImageInfo.ThumbnailSize && 
+            if (ImageInfo.ThumbnailOffset &&
+                ImageInfo.ThumbnailSize &&
                 ImageInfo.ThumbnailAtEnd){
-                // Must have a thumbnail that exists and is modifieable.
+                // Must have a thumbnail that exists and is modifiable.
 
                 char ThumbTempName_in[PATH_MAX+5];
                 char ThumbTempName_out[PATH_MAX+5];
@@ -723,6 +769,14 @@ static int DoAutoRotate(const char * FileName)
                 SaveThumbnail(ThumbTempName_in);
                 sprintf(RotateCommand,"jpegtran -trim -%s -outfile \"%s\" \"%s\"",
                     Argument, ThumbTempName_out, ThumbTempName_in);
+
+                // Disallow characters in the filenames that could be used to execute arbitrary
+                // shell commands with system() below.
+                if (strpbrk(FileName, "\";'&|`$")) {
+                    ErrNonfatal("Command has invalid characters.", 0, 0);
+                    unlink(ThumbTempName_in);
+                    return FALSE;
+                }
 
                 if (system(RotateCommand) == 0){
                     // Put the thumbnail back in the header
@@ -749,7 +803,15 @@ static int RegenerateThumbnail(const char * FileName)
         return FALSE;
     }
 
-    sprintf(ThumbnailGenCommand, "mogrify -thumbnail %dx%d \"%s\"", 
+    // Disallow characters in the filename that could be used to execute arbitrary
+    // shell commands with system() below.
+    if(strpbrk(FileName, "\";'&|`$")) {
+        ErrNonfatal("Filename has invalid characters.", 0, 0);
+        return FALSE;
+    }
+
+    snprintf(ThumbnailGenCommand, sizeof(ThumbnailGenCommand),
+        "mogrify -thumbnail %dx%d -quality 80 \"%s\"",
         RegenThumbnail, RegenThumbnail, FileName);
 
     if (system(ThumbnailGenCommand) == 0){
@@ -768,13 +830,13 @@ void FileTimeAsString(char * TimeStr)
 {
     struct tm ts;
     ts = *localtime(&ImageInfo.FileDateTime);
-    strftime(TimeStr, 20, "%Y-%m-%d %H:%M:%S", &ts);
+    strftime(TimeStr, 20, "%Y:%m:%d %H:%M:%S", &ts);
 }
 
 //--------------------------------------------------------------------------
 // Do selected operations to one file at a time.
 //--------------------------------------------------------------------------
-extern void ProcessFile(const char * FileName)
+void ProcessFile(const char * FileName)
 {
     int Modified = FALSE;
     ReadMode_t ReadMode;
@@ -786,9 +848,10 @@ extern void ProcessFile(const char * FileName)
 
     ReadMode = READ_METADATA;
     CurrentFile = FileName;
-    FilesMatched = 1; 
+    FilesMatched = 1;
 
     ResetJpgfile();
+    Clear_EXIF();
 
     // Start with an empty image information structure.
     memset(&ImageInfo, 0, sizeof(ImageInfo));
@@ -857,13 +920,12 @@ extern void ProcessFile(const char * FileName)
             Modified = TRUE;
         }
         ReadMode = READ_IMAGE;   // Don't re-read exif section again on next read.
+    }
 
-    }else if (ExifXferScrFile){
+    if (ExifXferScrFile){
         char RelativeExifName[PATH_MAX+1];
-
         // Make a relative name.
         RelativeName(RelativeExifName, ExifXferScrFile, FileName);
-
         if(!ReadJpegFile(RelativeExifName, READ_METADATA)) return;
 
         DiscardAllButExif();    // Don't re-read exif section again on next read.
@@ -883,6 +945,35 @@ extern void ProcessFile(const char * FileName)
         return;
     }
 
+    if (TrimExifTrailingZeroes){
+        if (ImageInfo.ThumbnailAtEnd){
+            Section_t * ExifSection;
+            int NumRedundant, WasRedundant;
+            unsigned char * StartRedundant;
+            //printf("Exif: Thumbnail %d - %d\n",ImageInfo.ThumbnailOffset, ImageInfo.ThumbnailOffset+ImageInfo.ThumbnailSize);
+            ExifSection = FindSection(M_EXIF);
+
+            StartRedundant = ExifSection->Data + 8 + ImageInfo.ThumbnailOffset+ImageInfo.ThumbnailSize;
+            WasRedundant = NumRedundant = (ExifSection->Size) - (ImageInfo.ThumbnailOffset + ImageInfo.ThumbnailSize + 8);
+
+            //printf("Exif length: %d  Wasted: %d\n",ExifSection->Size, NumRedundant);
+
+            for(;NumRedundant > 0 && StartRedundant[NumRedundant-1] == 0;NumRedundant--);// Only remove trailing bytes if they are zero.
+
+            if (NumRedundant != WasRedundant){
+                int NewExifSize;
+                printf("Trimming %d bytes from exif in %s\n", WasRedundant-NumRedundant, FileName);
+                NewExifSize = ImageInfo.ThumbnailOffset + ImageInfo.ThumbnailSize + 8 + NumRedundant;
+                ExifSection->Data[0] = (uchar)(NewExifSize >> 8); // Must write new length into exif data.
+                ExifSection->Data[1] = (uchar)NewExifSize;
+                ExifSection->Size = NewExifSize;
+                Modified = TRUE;
+            }else{
+                //printf("Noting to remove from %s\n", FileName);
+            }
+        }
+    }
+
     FileSequence += 1; // Count files processed.
 
     if (ShowConcise){
@@ -895,7 +986,7 @@ extern void ProcessFile(const char * FileName)
                 // if IPTC section is present, show it also.
                 Section_t * IptcSection;
                 IptcSection = FindSection(M_IPTC);
-            
+
                 if (IptcSection){
                     show_IPTC(IptcSection->Data, IptcSection->Size);
                 }
@@ -983,7 +1074,7 @@ extern void ProcessFile(const char * FileName)
             }else{
                 // Read it in.
                 // Replace the section.
-                CommentSize = fread(Comment, 1, 999, CommentFile);
+                CommentSize = fread(Comment, 1, MAX_COMMENT_SIZE, CommentFile);
                 fclose(CommentFile);
                 if (CommentSize < 0) CommentSize = 0;
             }
@@ -1042,9 +1133,8 @@ extern void ProcessFile(const char * FileName)
             RelativeName(OutFileName, CommentSavefileName, FileName);
 
             CommentFile = fopen(OutFileName,"w");
-
             if (CommentFile){
-                fwrite((char *)CommentSec->Data+2, CommentSec->Size-2 ,1, CommentFile);
+                fwrite((char *)CommentSec->Data+2 ,CommentSec->Size-2, 1, CommentFile);
                 fclose(CommentFile);
             }else{
                 ErrFatal("Could not write comment file");
@@ -1088,12 +1178,12 @@ extern void ProcessFile(const char * FileName)
             tm = *localtime(&UnixTime);
 
             // Print to temp buffer first to avoid putting null termination in destination.
-            // snprintf() would do the trick, hbut not available everywhere (like FreeBSD 4.4)
+            // snprintf() would do the trick, but not available everywhere (like FreeBSD 4.4)
             sprintf(TempBuf, "%04d:%02d:%02d %02d:%02d:%02d",
                 tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,
                 tm.tm_hour, tm.tm_min, tm.tm_sec);
-            
-skip_unixtime:         
+
+skip_unixtime:
             ExifSection = FindSection(M_EXIF);
 
             for (a = 0; a < ImageInfo.numDateTimeTags; a++) {
@@ -1152,7 +1242,7 @@ skip_unixtime:
 
             mtime.actime = buf.st_mtime;
             mtime.modtime = buf.st_mtime;
-            
+
             utime(FileName, &mtime);
         }
 
@@ -1164,7 +1254,7 @@ skip_unixtime:
     if (Exif2FileTime){
         // Set the file date to the date from the exif header.
         if (ImageInfo.numDateTimeTags){
-            // Converte the file date to Unix time.
+            // Convert the file date to Unix time.
             struct tm tm;
             time_t UnixTime;
             struct utimbuf mtime;
@@ -1205,7 +1295,7 @@ badtime:
 static void Usage (void)
 {
     printf("Jhead is a program for manipulating settings and thumbnails in Exif jpeg headers\n"
-           "used by most Digital Cameras.  v"JHEAD_VERSION" Matthias Wandel, Jun 22 2012.\n"
+           "used by most Digital Cameras.  v"JHEAD_VERSION" Matthias Wandel, Oct 5 2020.\n"
            "http://www.sentex.net/~mwandel/jhead\n"
            "\n");
 
@@ -1220,7 +1310,7 @@ static void Usage (void)
            "  -dc        Delete comment field (as left by progs like Photoshop & Compupic)\n"
            "  -de        Strip Exif section (smaller JPEG file, but lose digicam info)\n"
            "  -di        Delete IPTC section (from Photoshop, or Picasa)\n"
-           "  -dx        Deletex XMP section\n"
+           "  -dx        Delete XMP section\n"
            "  -du        Delete non image sections except for Exif and comment sections\n"
            "  -purejpg   Strip all unnecessary data from jpeg (combines -dc -de and -du)\n"
            "  -mkexif    Create new minimal exif section (overwrites pre-existing exif)\n"
@@ -1231,6 +1321,7 @@ static void Usage (void)
            "  -ci <name> Insert comment section from a file.  -cs and -ci use same naming\n"
            "             scheme as used by the -st option\n"
            "  -cl string Insert literal comment string\n"
+           "  -zt        Trim exif header trailing zeroes (Nikon 1 wastes 30k that way)\n"
 
            "\nDATE / TIME MANIPULATION:\n"
            "  -ft        Set file modification time to Exif time\n"
@@ -1249,8 +1340,7 @@ static void Usage (void)
            "             '%%i' will include a sequence number, starting from 1. You can\n"
            "             You can specify '%%03i' for example to get leading zeros.\n"
            "             This feature is useful for ordering files from multiple digicams to\n"
-           "             sequence of taking.  Only renames files whose names are mostly\n"
-           "             numerical (as assigned by digicam)\n"
+           "             sequence of taking.\n"
            "             The '.jpg' is automatically added to the end of the name.  If the\n"
            "             destination name already exists, a letter or digit is added to \n"
            "             the end of the name to make it unique.\n"
@@ -1260,7 +1350,7 @@ static void Usage (void)
            "             Use together with -n to rename .AVI files from exif in .THM files\n"
            "             for example\n"
            "  -ta<+|->h[:mm[:ss]]\n"
-           "             Adjust time by h:mm backwards or forwards.  Useful when having\n"
+           "             Adjust time by h:mm forwards or backwards.  Useful when having\n"
            "             taken pictures with the wrong time set on the camera, such as when\n"
            "             traveling across time zones or DST changes. Dates can be adjusted\n"
            "             by offsetting by 24 hours or more.  For large date adjustments,\n"
@@ -1276,11 +1366,12 @@ static void Usage (void)
            "             and time in the format yyyy:mm:dd/hh:mm:ss\n"
            "  -ts<time>  Set the Exif internal time to <time>.  <time> is in the format\n"
            "             yyyy:mm:dd-hh:mm:ss\n"
+           "  -tf file   Set the exif time to the modification time from another file\n"
            "  -ds<date>  Set the Exif internal date.  <date> is in the format YYYY:MM:DD\n"
            "             or YYYY:MM or YYYY\n"
 
            "\nTHUMBNAIL MANIPULATION:\n"
-           "  -dt        Remove exif integral thumbnails.   Typically trims 10k\n"
+           "  -dt        Remove exif integral thumbnails.  Typically trims 10k\n"
            "  -st <name> Save Exif thumbnail, if there is one, in file <name>\n"
            "             If output file name contains the substring \"&i\" then the\n"
            "             image file name is substitute for the &i.  Note that quotes around\n"
@@ -1290,14 +1381,15 @@ static void Usage (void)
 #endif
            "  -rt <name> Replace Exif thumbnail.  Can only be done with headers that\n"
            "             already contain a thumbnail.\n"
-           "  -rgt[size] Regnerate exif thumbnail.  Only works if image already\n"
-           "             contains a thumbail.  size specifies maximum height or width of\n"
+           "  -rgt[size] Regenerate exif thumbnail.  Only works if image already\n"
+           "             contains a thumbnail.  size specifies maximum height or width of\n"
            "             thumbnail.  Relies on 'mogrify' programs to be on path\n"
 
            "\nROTATION TAG MANIPULATION:\n"
            "  -autorot   Invoke jpegtran to rotate images according to Exif orientation tag\n"
+           "             and clear Exif orientation tag\n"
            "             Note: Windows users must get jpegtran for this to work\n"
-           "  -norot     Zero out the rotation tag.  This to avoid some browsers from\n" 
+           "  -norot     Zero out the rotation tag.  This to avoid some browsers from\n"
            "             rotating the image again after you rotated it but neglected to\n"
            "             clear the rotation tag\n"
 
@@ -1307,7 +1399,7 @@ static void Usage (void)
            "  -q         Quiet (no messages on success, like Unix)\n"
            "  -V         Show jhead version\n"
            "  -exifmap   Dump header bytes, annotate.  Pipe thru sort for better viewing\n"
-           "  -se        Supress error messages relating to corrupt exif header structure\n"
+           "  -se        Suppress error messages relating to corrupt exif header structure\n"
            "  -c         concise output\n"
            "  -nofinfo   Don't show file info (name/size/date)\n"
 
@@ -1317,6 +1409,7 @@ static void Usage (void)
            "             camera model description\n"
            "  -exonly    Skip all files that don't have an exif header (skip all jpegs that\n"
            "             were not created by digicam)\n"
+           "  -quality x Only work on images with JPEG quality factor x or higher\n"
            "  -cmd command\n"
            "             Apply 'command' to every file, then re-insert exif and command\n"
            "             sections into the image. &i will be substituted for the input file\n"
@@ -1325,7 +1418,7 @@ static void Usage (void)
            "             For example, with my Canon S100, which suboptimally compresses\n"
            "             jpegs I can specify\n"
            "                jhead -cmd \"mogrify -quality 80 &i\" *.jpg\n"
-           "             to re-compress a lot of images using ImageMagick to half the size,\n" 
+           "             to re-compress a lot of images using ImageMagick to half the size,\n"
            "             and no visible loss of quality while keeping the exif header\n"
            "             Another invocation I like to use is jpegtran (hard to find for\n"
            "             windows).  I type:\n"
@@ -1360,7 +1453,7 @@ static void Usage (void)
 //--------------------------------------------------------------------------
 // Parse specified date or date+time from command line.
 //--------------------------------------------------------------------------
-time_t ParseCmdDate(char * DateSpecified)
+static time_t ParseCmdDate(char * DateSpecified)
 {
     int a;
     struct tm tm;
@@ -1378,16 +1471,16 @@ time_t ParseCmdDate(char * DateSpecified)
         // or YYYY:MM:DD+HH:MM:SS
         ErrFatal("Could not parse specified date");
     }
-    tm.tm_isdst = -1;  
-    tm.tm_mon -= 1;      // Adjust for unix zero-based months 
-    tm.tm_year -= 1900;  // Adjust for year starting at 1900 
+    tm.tm_isdst = -1;
+    tm.tm_mon -= 1;      // Adjust for unix zero-based months
+    tm.tm_year -= 1900;  // Adjust for year starting at 1900
 
     UnixTime = mktime(&tm);
     if (UnixTime == -1){
         ErrFatal("Specified time is invalid or out of range");
     }
-    
-    return UnixTime;    
+
+    return UnixTime;
 }
 
 //--------------------------------------------------------------------------
@@ -1440,24 +1533,26 @@ int main (int argc, char **argv)
         }else if (!strcmp(arg,"-cl")){
             CommentInsertLiteral = argv[++argn];
             DoModify |= MODIFY_JPEG;
+        }else if (!strcmp(arg,"-zt")){
+            TrimExifTrailingZeroes = TRUE;
+            DoModify |= MODIFY_JPEG;
         }else if (!strcmp(arg,"-mkexif")){
             CreateExifSection = TRUE;
             DoModify |= MODIFY_JPEG;
-
     // Output verbosity control
-        }else if (!strcmp(arg,"-h")){
+        }else if (!strcmp(arg,"-h") || !strcmp(arg,"--help")){
             Usage();
         }else if (!strcmp(arg,"-v")){
             ShowTags = TRUE;
         }else if (!strcmp(arg,"-q")){
             Quiet = TRUE;
         }else if (!strcmp(arg,"-V")){
-            printf("Jhead version: "JHEAD_VERSION"   Compiled: "__DATE__"\n");
+            printf("Jhead version: "JHEAD_VERSION"\n");
             exit(0);
         }else if (!strcmp(arg,"-exifmap")){
             DumpExifMap = TRUE;
         }else if (!strcmp(arg,"-se")){
-            SupressNonFatalErrors = TRUE;
+            SuppressNonFatalErrors = TRUE;
         }else if (!strcmp(arg,"-c")){
             ShowConcise = TRUE;
         }else if (!strcmp(arg,"-nofinfo")){
@@ -1541,13 +1636,13 @@ int main (int argc, char **argv)
             if (pOldDate){
                 OldDate = ParseCmdDate(pOldDate+1);
             }else{
-                ErrFatal("Must specifiy second date for -da option");
+                ErrFatal("Must specify second date for -da option");
             }
             if (ExifTimeAdjust) ErrFatal("Can only use one of -da or -ta options at once");
             ExifTimeAdjust = NewDate-OldDate;
             DoModify |= MODIFY_JPEG;
         }else if (!memcmp(arg,"-dsft",5)){
-            // Set file time to date/time in exif
+            // Set exif time to the timestamp of the file.
             FileTimeToExif = TRUE;
             DoModify |= MODIFY_JPEG;
         }else if (!memcmp(arg,"-ds",3)){
@@ -1555,7 +1650,7 @@ int main (int argc, char **argv)
             int a;
             // Check date validity and copy it.  Could be incompletely specified.
             strcpy(DateSet, "0000:01:01");
-            for (a=0;arg[a+3];a++){
+            for (a=0;arg[a+3] && a < sizeof(DateSet);a++){
                 if (isdigit(DateSet[a])){
                     if (!isdigit(arg[a+3])){
                         a = 0;
@@ -1582,9 +1677,9 @@ int main (int argc, char **argv)
 
             c = strstr(arg+1, "-");
             if (c) *c = ' '; // Replace '-' with a space.
-            
+
             if (!Exif2tm(&tm, arg+3)){
-                ErrFatal("-ts option must be followed by time in format yyyy:mmm:dd-hh:mm:ss\n"
+                ErrFatal("-ts option must be followed by time in format yyyy:mm:dd-hh:mm:ss\n"
                         "Example: jhead -ts2001:01:01-12:00:00 foo.jpg");
             }
 
@@ -1593,10 +1688,30 @@ int main (int argc, char **argv)
             if ((int)ExifTimeSet == -1) ErrFatal("Time specified is out of range");
             DoModify |= MODIFY_JPEG;
 
+        }else if (!memcmp(arg,"-tf",3)){
+            // Set the exif time to the modification time from another file.
+            struct stat stat_buf;
+            if (stat(argv[++argn], &stat_buf) == 0){
+                ExifTimeSet = stat_buf.st_mtime;
+            }else{
+                ErrFatal("Could not read file");
+            }
+            DoModify |= MODIFY_JPEG;
+
     // File matching and selection
         }else if (!strcmp(arg,"-model")){
             if (argn+1 >= argc) Usage(); // No extra argument.
             FilterModel = argv[++argn];
+        }else if (!strcmp(arg,"-quality")){
+            if (argn+1 >= argc) Usage(); // No extra argument.
+            if (sscanf(argv[++argn], "%d", &FilterQuality) != 1){
+                Usage();
+            }
+        }else if (!strcmp(arg,"-proc")){
+            sscanf(argv[++argn], "%d", &ProcessOnly);
+            if (ProcessOnly < 0 || ProcessOnly > 2){
+                ErrFatal("-proc must be followed by a number 0-2");
+            }
         }else if (!strcmp(arg,"-exonly")){
             ExifOnly = 1;
         }else if (!strcmp(arg,"-orp")){
@@ -1629,7 +1744,7 @@ int main (int argc, char **argv)
             exit(-1);
         }
         if (argn >= argc){
-            // Used an extra argument - becuase the last argument 
+            // Used an extra argument - because the last argument
             // used up an extr argument.
             ErrFatal("Extra argument required");
         }
@@ -1640,8 +1755,8 @@ int main (int argc, char **argv)
 
     if (ThumbSaveName != NULL && strcmp(ThumbSaveName, "&i") == 0){
         printf("Error: By specifying \"&i\" for the thumbail name, your original file\n"
-               "       will be overwitten.  If this is what you really want,\n"
-               "       specify  -st \"./&i\"  to override this check\n");
+               "       will be overwritten.  If this is what you really want,\n"
+               "       specify -st \"./&i\"  to override this check\n");
         exit(0);
     }
 
@@ -1677,7 +1792,7 @@ int main (int argc, char **argv)
             // subdirectories under Windows.
             MyGlob(argv[argn], ProcessFile);
         #else
-            // Under linux, don't do any extra fancy globbing - shell globbing is 
+            // Under linux, don't do any extra fancy globbing - shell globbing is
             // pretty fancy as it is - although not as good as myglob.c
             ProcessFile(argv[argn]);
         #endif
@@ -1686,12 +1801,10 @@ int main (int argc, char **argv)
             fprintf(stderr, "Error: No files matched '%s'\n",argv[argn]);
         }
     }
-    
+
     if (FileSequence == 0){
         return EXIT_FAILURE;
     }else{
         return EXIT_SUCCESS;
     }
 }
-
-

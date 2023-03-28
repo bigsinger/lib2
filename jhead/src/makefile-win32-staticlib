@@ -1,19 +1,37 @@
+
 #--------------------------------
-# jhead makefile for Win32
+# jhead Static library makefile for Win32
 #--------------------------------
+
+
+!IFNDEF DEBUG
+DEBUG = 0
+!ENDIF
+
+!IF $(DEBUG)
+!MESSAGE Compiling in debug mode (DEBUG = $(DEBUG))
+!ELSE
+!MESSAGE Compiling in release mode (DEBUG = $(DEBUG))
+!ENDIF
+
 
 CC=cl /nologo
+!IF $(DEBUG)
+LIB_NAME=jhead_staticD
+CFLAGS=-c -Od -W3 -Zp -D _CRT_SECURE_NO_WARNINGS
+!ELSE
+LIB_NAME=jhead_static
 CFLAGS=-c -Ox -Os -W3 -Zp -D _CRT_SECURE_NO_WARNINGS
+!ENDIF
 
-
-LINKER=link
-LINKCON = /nologo
+AR=lib /nologo
 OBJ = obj
 
-all:jhead.exe obj
 
-obj: 
-	mkdir obj
+all: $(LIB_NAME).lib obj
+
+obj:
+    mkdir obj
 
 OBJECTS_JHEAD = $(OBJ)\jhead.obj \
                 $(OBJ)\jpgfile.obj \
@@ -28,5 +46,5 @@ OBJECTS_JHEAD = $(OBJ)\jhead.obj \
 $(OBJECTS_JHEAD): $(@B).c jhead.h obj
     $(CC) /Fo$(OBJ)\ $(CFLAGS) $(@B).c
 
-jhead.exe: $(OBJECTS_JHEAD)
-    $(LINKER) $(LINKCON) -OUT:jhead.exe $(OBJECTS_JHEAD)
+$(LIB_NAME).lib: $(OBJECTS_JHEAD)
+    $(AR) -out:$(LIB_NAME).lib $(OBJECTS_JHEAD)
