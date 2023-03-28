@@ -1486,6 +1486,7 @@ static time_t ParseCmdDate(char * DateSpecified)
 //--------------------------------------------------------------------------
 // The main program.
 //--------------------------------------------------------------------------
+#if 0
 int main (int argc, char **argv)
 {
     int argn;
@@ -1808,3 +1809,4 @@ int main (int argc, char **argv)
         return EXIT_SUCCESS;
     }
 }
+#endif // 0
