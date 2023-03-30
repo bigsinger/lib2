@@ -10,3 +10,4 @@
 /jhead/src/obj
 /jhead/src/tests
 *.obj
+/zlib/src/*.exe
