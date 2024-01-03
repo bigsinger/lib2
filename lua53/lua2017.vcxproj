@@ -200,6 +200,7 @@
     <CodeAnalysisRuleAssemblies />
     <IntDir>$(SolutionDir)temp\$(ProjectName)_$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)</TargetName>
+    <OutDir>$(SolutionDir)../2022x64static/</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(ProjectDir)\..\2008share\</OutDir>
@@ -213,6 +214,7 @@
     <CodeAnalysisRules />
     <CodeAnalysisRuleAssemblies />
     <IntDir>$(SolutionDir)temp\$(ProjectName)_$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)../2022x64static/</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Lib_Debug|Win32'">
     <OutDir>$(SolutionDir)../2022static/</OutDir>
@@ -228,6 +230,7 @@
     <CodeAnalysisRuleAssemblies />
     <IntDir>$(SolutionDir)temp\$(ProjectName)_$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)D</TargetName>
+    <OutDir>$(SolutionDir)../2022x64static/</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Lib_Release|Win32'">
     <OutDir>$(SolutionDir)../2022static/</OutDir>
@@ -241,6 +244,7 @@
     <CodeAnalysisRules />
     <CodeAnalysisRuleAssemblies />
     <IntDir>$(SolutionDir)temp\$(ProjectName)_$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)../2022x64static/</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -333,7 +337,7 @@
       <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
     <Lib>
-      <OutputFile>$(SolutionDir)..\2017static\$(ProjectName)D.lib</OutputFile>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Lib_Release|Win32'">
@@ -366,7 +370,7 @@
       <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
     <Lib>
-      <OutputFile>$(SolutionDir)..\2017static\$(ProjectName).lib</OutputFile>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Lib>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
