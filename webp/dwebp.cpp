@@ -1,3 +1,5 @@
+#define HAVE_WINCODEC_H
+
 #include "dwebp.h"
 #include "./decode.h"
 #include "./imageio/image_enc.h"
@@ -5,6 +7,7 @@
 #include <locale>
 #include <codecvt>
 #include <string>
+
 
 // webpÍ¼Æ¬×ª»»ÎªÍ¼Æ¬
 // ²Î¿¼libwebpÔ´Âë£ºexamples/dwebp.c https://github.com/webmproject/libwebp/blob/1.0.3/examples/dwebp.c
@@ -106,8 +109,8 @@ bool Webp2Image(const char* in_file, const char* out_file, const char* pixel_for
     }
 
     if (out_file != NULL) {
-        success = WebPSaveImage(output_buffer, format, out_file);
-    } 
+       success = WebPSaveImage(output_buffer, format, out_file);
+    }
 
 Exit:
     WebPFreeDecBuffer(output_buffer);
