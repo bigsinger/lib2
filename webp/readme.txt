@@ -12,3 +12,7 @@ LIBWEBP_OBJS = $(LIBWEBPDECODER_OBJS) $(ENC_OBJS) $(DSP_ENC_OBJS) \
 
 LIBWEBP_OBJS = $(LIBWEBPDECODER_OBJS) $(ENC_OBJS) $(DSP_ENC_OBJS) \
                $(UTILS_ENC_OBJS) $(DLL_OBJS) $(IMAGEIO_ENC_OBJS) $(IMAGEIO_DEC_OBJS) $(IMAGEIO_UTIL_OBJS)
+               
+               
+编译：
+nmake /f Makefile.vc CFG=release-static RTLIBCFG=static OBJDIR=output
