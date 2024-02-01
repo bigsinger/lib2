@@ -7,7 +7,31 @@
 #include <locale>
 #include <codecvt>
 #include <string>
+#include <iostream>
+#include <fstream>
 
+
+// ÅÐ¶ÏÊÇ·ñÊÇwebpÍ¼Æ¬
+// ²Î¿¼£ºhttps://cpp.hotexamples.com/zh/examples/-/-/WebPGetInfo/cpp-webpgetinfo-function-examples.html ImageFromData
+bool IsWebpImage(const char* filename) {
+    bool yes = false;
+
+    std::ifstream in_file(filename, std::ios::binary);
+    in_file.seekg(0, std::ios::end);
+    int file_size = (int)in_file.tellg();
+    if (file_size > 0) {
+        uint8_t* buff = new uint8_t[file_size];
+        if (buff) {
+            in_file.seekg(0);
+            in_file.read((char*)buff, file_size);
+            int w = 0, h = 0;
+            yes = WebPGetInfo((const uint8_t*)buff, file_size, &w, &h);
+            delete[] buff;
+        }
+    }
+
+    return yes;
+}
 
 // webpÍ¼Æ¬×ª»»ÎªÍ¼Æ¬
 // ²Î¿¼libwebpÔ´Âë£ºexamples/dwebp.c https://github.com/webmproject/libwebp/blob/1.0.3/examples/dwebp.c
